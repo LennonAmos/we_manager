@@ -1726,7 +1726,7 @@ export function liveEngineFlagOptions(
   }
 }
 
-function hotswapOptionsFor(wallpaperPath: string, options: LweLaunchOptions): HotswapOptions {
+export function hotswapOptionsFor(wallpaperPath: string, options: LweLaunchOptions): HotswapOptions {
   const defaultSensitivity = getDefaultAudioSensitivity()
   return {
     path: wallpaperPath,
@@ -1753,6 +1753,9 @@ function hotswapOptionsFor(wallpaperPath: string, options: LweLaunchOptions): Ho
       ...options.audioSensitivity
     },
     soundVolume: options.soundVolume ?? {},
+    // 0 must be sent. Leaving volume out keeps the previous wallpaper's level, so a muted wallpaper
+    // comes back audible when it is applied to another screen.
+    ...(options.volume !== undefined ? { volume: options.volume } : {}),
     ...(supportsEffectHotswap()
       ? { disabledEffects: options.disabledEffects ?? [], enabledEffects: options.enabledEffects ?? [] }
       : {}),
@@ -1772,8 +1775,10 @@ export async function launchLweAsync(wallpaperPath: string, options: LweLaunchOp
   }
 
   const existing = liveInstance(screen)
+  // A different wallpaper has to be a new process. Hotswapping the path leaves the previous
+  // wallpaper's audio playing, and the new one often does not start until a later change (such as moving it).
   const canHotswap =
-    existing &&
+    existing?.wallpaperPath === wallpaperPath &&
     !options.forceFresh &&
     !options.customArgs?.trim() &&
     existing.launchKey === key &&

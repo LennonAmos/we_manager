@@ -27,6 +27,7 @@ const {
   buildLweEnvVars,
   buildHotswapLines,
   buildLweArgs,
+  hotswapOptionsFor,
   lwePackageOwner,
   nodeDevelPackage,
   parsePacmanRepos,
@@ -169,6 +170,10 @@ describe('buildHotswapLines', () => {
       'disable-object=12',
       'enable-object=fog'
     ])
+  })
+
+  it('keeps a muted wallpaper muted when the swap is built', () => {
+    expect(buildHotswapLines(hotswapOptionsFor('/w/quiet', { volume: 0, soundVolume: { '7': 0 } }))).toContain('volume=0')
   })
 
   it('writes a full wallpaper swap in the order the engine expects', () => {

@@ -11,9 +11,9 @@ import { initDesktopIcons, cleanupDesktopIcons } from './services/desktop-icons.
 import { getTrayEnabled, getAutostartEnabled, getAutostartMinimized, getAutostartPlaylistId, getKillLweOnQuit, getConfiguredBackupPath } from './services/config.service'
 import { refreshAutostartExec } from './services/autostart.service'
 import { createTray } from './services/tray.service'
-import { initPlaylistPlayer, startPlaylist } from './services/playlist-player.service'
+import { activePlaylistScreens, initPlaylistPlayer, startPlaylist } from './services/playlist-player.service'
 import { checkEarlierRunEngines, killAllLweProcesses, getLweStatus } from './services/lwe.service'
-import { initDisplay } from './services/display.service'
+import { initDisplay, restoreAssignedWallpapers } from './services/display.service'
 import { initSchedule } from './services/schedule.service'
 import { initUpdates } from './services/update.service'
 import { detectDesktopEnv, hasStatusNotifierHost } from './utils/platform'
@@ -244,6 +244,7 @@ app.whenReady().then(async () => {
   await checkEarlierRunEngines()
   initDisplay(win)
   const resumed = initPlaylistPlayer(win)
+  await restoreAssignedWallpapers(new Set(activePlaylistScreens()))
 
   if (getTrayEnabled()) createTray(win)
 

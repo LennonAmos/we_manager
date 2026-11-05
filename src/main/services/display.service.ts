@@ -15,6 +15,7 @@ import { applyWallpaperMeta, isAnimatedWallpaper } from './wallpaper.service'
 import {
   ALL_SCREENS,
   getActiveScreens,
+  getLweStatus,
   getRunningInstances,
   hotswapLweSettings,
   launchLweAsync,
@@ -307,4 +308,28 @@ export function initDisplay(window: BrowserWindow): void {
   onLweExit((info) => {
     void handleExit(info).catch((err: unknown) => { console.error('[Display] Crash handling failed:', err) })
   })
+}
+
+/**
+ * Puts the last wallpaper back on each screen after a restart. A live engine already showing it is left
+ * alone. Screens a playlist just claimed are skipped so the two restores do not launch over each other.
+ */
+export async function restoreAssignedWallpapers(skipScreens: ReadonlySet<ScreenTarget> = new Set()): Promise<void> {
+  if (!getLweStatus().installed) return
+  const targets = new Set(getDisplayTargets())
+  const running = new Map(getRunningInstances().map((inst) => [inst.screen, inst]))
+  for (const [screen, wallpaperId] of Object.entries(getAssignments())) {
+    if (skipScreens.has(screen) || !targets.has(screen)) continue
+    const wallpaper = getWallpaper(wallpaperId)
+    if (!wallpaper?.localPath) continue
+    const inst = running.get(screen)
+    // same wallpaper, still on this screen: nothing to reload
+    if (inst && !inst.split && inst.wallpaperPath === wallpaper.localPath) continue
+    try {
+      console.log(`[Display] Restoring ${wallpaper.title} on ${screen}`)
+      await showWallpaper(wallpaper, screen, { dependencyPrompt: 'once', forceFresh: !inst })
+    } catch (err) {
+      console.error(`[Display] Could not restore ${wallpaper.title} on ${screen}:`, (err as Error).message)
+    }
+  }
 }

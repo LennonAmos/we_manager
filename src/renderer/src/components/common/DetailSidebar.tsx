@@ -708,9 +708,13 @@ export default function DetailSidebar({
 
   const [volumeDraft, setVolumeDraft] = useState<number | null>(null)
   const [isCommittingVolume, setIsCommittingVolume] = useState(false)
+  // the range input emits its max (100%) on its own when the panel re-renders, which turned a muted wallpaper back on
+  const volumeDragging = useRef(false)
+  const volumeLive = useRef<number | null>(null)
   const volume = volumeDraft ?? libraryMeta?.volumeOverride ?? 15
 
   async function commitVolume(v: number) {
+    volumeDragging.current = false
     setIsCommittingVolume(true)
     try {
       await persistAndMaybeRelaunch({ volumeOverride: v })
@@ -1355,15 +1359,35 @@ export default function DetailSidebar({
               max={128}
               value={volume}
               disabled={isCommittingVolume}
+              onPointerDown={(e) => {
+                volumeDragging.current = true
+                e.currentTarget.setPointerCapture(e.pointerId)
+              }}
+              onKeyDown={(e) => {
+                if (isRangeKey(e.key)) volumeDragging.current = true
+              }}
               onChange={(e) => {
+                if (!volumeDragging.current) return
                 const v = Number(e.target.value)
+                if (!Number.isFinite(v)) return
+                volumeLive.current = v
                 setVolumeDraft(v)
                 previewLive({ volume: v })
               }}
-              onMouseUp={(e) => void commitVolume(Number(e.currentTarget.value))}
-              onTouchEnd={(e) => void commitVolume(Number(e.currentTarget.value))}
-              onKeyUp={(e) => void (isRangeKey(e.key) && commitVolume(Number(e.currentTarget.value)))}
-              className="w-full accent-accent-500 disabled:opacity-50"
+              onPointerUp={() => {
+                const v = volumeLive.current
+                volumeLive.current = null
+                volumeDragging.current = false
+                if (v !== null) void commitVolume(v)
+              }}
+              onKeyUp={(e) => {
+                if (!isRangeKey(e.key)) return
+                const v = volumeLive.current ?? Number(e.currentTarget.value)
+                volumeLive.current = null
+                volumeDragging.current = false
+                if (Number.isFinite(v)) void commitVolume(v)
+              }}
+              className="w-full touch-none accent-accent-500 disabled:opacity-50"
             />
           </div>
         )}

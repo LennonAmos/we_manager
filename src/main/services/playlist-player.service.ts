@@ -382,6 +382,11 @@ function savedPlayers(): Record<ScreenTarget, SavedPlayer> {
   return legacyId ? { [ALL_SCREENS]: { playlistId: legacyId, isPlaying: store.get('isPlaying') } } : {}
 }
 
+/** Screens a playlist owns after init, so wallpaper restore does not launch over them */
+export function activePlaylistScreens(): ScreenTarget[] {
+  return [...players.values()].filter((player) => player.state.playlistId).map((player) => player.state.screen)
+}
+
 /** Resumes the playlists active at the last close, true if any (the autostart playlist is then skipped) */
 
 export function initPlaylistPlayer(window: BrowserWindow): boolean {
