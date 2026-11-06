@@ -30,3 +30,13 @@ export function playlistSkipScreens(skipResume: boolean, saved: readonly string[
 export function mergeSkipScreens(...groups: readonly (readonly string[])[]): Set<string> {
   return new Set(groups.flat())
 }
+
+/** True when something else took the screen after restore read it. The newer launch stays. */
+export function restoreSuperseded(
+  assignedAtStart: string,
+  assignedNow: string | undefined,
+  useAtStart: number,
+  useNow: number
+): boolean {
+  return assignedNow !== assignedAtStart || useNow !== useAtStart
+}

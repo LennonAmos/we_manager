@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mergeSkipScreens, planRestore, playlistSkipScreens, type RestoreInput } from './restore-plan'
+import { mergeSkipScreens, planRestore, playlistSkipScreens, restoreSuperseded, type RestoreInput } from './restore-plan'
 
 function input(patch: Partial<RestoreInput> = {}): RestoreInput {
   return {
@@ -55,6 +55,24 @@ describe('playlistSkipScreens', () => {
 
   it('skips only the screens that actually resumed', () => {
     expect(playlistSkipScreens(false, ['HDMI-A-2'], ['HDMI-A-3'])).toEqual(['HDMI-A-3'])
+  })
+})
+
+describe('restoreSuperseded', () => {
+  it('keeps going when the screen is still the one restore read', () => {
+    expect(restoreSuperseded('a', 'a', 0, 0)).toBe(false)
+  })
+
+  it('stops when the assignment changed while an earlier screen was launching', () => {
+    expect(restoreSuperseded('a', 'b', 0, 1)).toBe(true)
+  })
+
+  it('stops when the same wallpaper was launched again', () => {
+    expect(restoreSuperseded('a', 'a', 0, 1)).toBe(true)
+  })
+
+  it('stops when the assignment was cleared', () => {
+    expect(restoreSuperseded('a', undefined, 0, 1)).toBe(true)
   })
 })
 

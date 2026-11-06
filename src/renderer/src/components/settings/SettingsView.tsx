@@ -846,6 +846,7 @@ function SettingsPanels({ onReset }: { onReset: () => void }) {
                   <Toggle on={skipPlaylistResume} onClick={() => void handleSkipPlaylistResumeToggle()} />
                   <span className="text-sm text-gray-300">{t('settings.skipPlaylistResume')}</span>
                 </label>
+                <p className="mt-1 text-xs text-gray-600">{t('settings.skipPlaylistResumeHint')}</p>
                 <label className="mt-3 flex items-center gap-3 cursor-pointer">
                   <Toggle on={freshProcessOnPathChange} onClick={() => void handleFreshProcessToggle()} />
                   <span className="text-sm text-gray-300">{t('settings.freshProcessOnPathChange')}</span>
