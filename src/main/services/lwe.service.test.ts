@@ -19,6 +19,7 @@ vi.mock('./config.service', () => ({
   getDefaultAudioSensitivity: () => 1,
   getDisablePuppetAnimation: () => false,
   getScriptLimits: () => false,
+  getFreshProcessOnPathChange: () => false,
   getLoader: () => loaderSettings
 }))
 
@@ -27,6 +28,7 @@ const {
   buildLweEnvVars,
   buildHotswapLines,
   buildLweArgs,
+  canHotswapExisting,
   hotswapOptionsFor,
   lwePackageOwner,
   nodeDevelPackage,
@@ -194,6 +196,34 @@ describe('buildHotswapLines', () => {
       'audio-sensitivity=*=2',
       'sound-volume=7=0.5'
     ])
+  })
+})
+
+describe('canHotswapExisting', () => {
+  const existing = { wallpaperPath: '/w/a', launchKey: 'k', controlFile: '/run/c' }
+
+  it('hotswaps a different wallpaper by default', () => {
+    expect(canHotswapExisting(existing, {}, 'k', '/w/b', 1, false)).toBe(true)
+  })
+
+  it('starts a new process for a different path when that setting is on', () => {
+    expect(canHotswapExisting(existing, {}, 'k', '/w/b', 1, true)).toBe(false)
+  })
+
+  it('keeps the same wallpaper on a hotswap even with the setting on', () => {
+    expect(canHotswapExisting(existing, {}, 'k', '/w/a', 1, true)).toBe(true)
+  })
+
+  it('does not hotswap a forced fresh launch, a different key, or a missing engine', () => {
+    expect(canHotswapExisting(existing, { forceFresh: true }, 'k', '/w/a', 1, false)).toBe(false)
+    expect(canHotswapExisting(existing, {}, 'other', '/w/a', 1, false)).toBe(false)
+    expect(canHotswapExisting(undefined, {}, 'k', '/w/a', 0, false)).toBe(false)
+  })
+
+  it('hotswaps a missing control file only when that engine is the only one', () => {
+    const bare = { wallpaperPath: '/w/a', launchKey: 'k', controlFile: null }
+    expect(canHotswapExisting(bare, {}, 'k', '/w/b', 1, false)).toBe(true)
+    expect(canHotswapExisting(bare, {}, 'k', '/w/b', 2, false)).toBe(false)
   })
 })
 

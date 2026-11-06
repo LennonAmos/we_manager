@@ -63,7 +63,8 @@ import {
   getDefaultAudioSensitivity,
   getDisablePuppetAnimation,
   getScriptLimits,
-  getDisabledScreens
+  getDisabledScreens,
+  getFreshProcessOnPathChange
 } from './config.service'
 import { DEFAULT_LWE_FPS, DEFAULT_LWE_REPO } from '@shared/constants'
 import { engineFlagArgs, filterSupportedArgs } from '@shared/engineFlags'
@@ -1764,6 +1765,22 @@ export function hotswapOptionsFor(wallpaperPath: string, options: LweLaunchOptio
   }
 }
 
+/** Same-path changes hotswap. A different path hotswaps too, unless the setting starts a new process. */
+export function canHotswapExisting(
+  existing: { wallpaperPath: string; launchKey: string; controlFile: string | null } | undefined,
+  options: { forceFresh?: boolean; customArgs?: string },
+  key: string,
+  wallpaperPath: string,
+  liveCount: number,
+  freshProcessOnPathChange: boolean
+): boolean {
+  if (options.forceFresh || !!options.customArgs?.trim()) return false
+  if (!existing || existing.launchKey !== key) return false
+  if (existing.controlFile === null && liveCount !== 1) return false
+  if (freshProcessOnPathChange && existing.wallpaperPath !== wallpaperPath) return false
+  return true
+}
+
 /** Hotswaps the engine on the screen when possible, else restarts it. Resolves once it survived 2s */
 export async function launchLweAsync(wallpaperPath: string, options: LweLaunchOptions = {}): Promise<void> {
   const screen = options.screen ?? ALL_SCREENS
@@ -1775,11 +1792,14 @@ export async function launchLweAsync(wallpaperPath: string, options: LweLaunchOp
   }
 
   const existing = liveInstance(screen)
-  const canHotswap =
-    !options.forceFresh &&
-    !options.customArgs?.trim() &&
-    existing?.launchKey === key &&
-    (existing.controlFile !== null || liveInstances().length === 1)
+  const canHotswap = canHotswapExisting(
+    existing,
+    options,
+    key,
+    wallpaperPath,
+    liveInstances().length,
+    getFreshProcessOnPathChange()
+  )
 
   if (canHotswap && (await hotswapLweSettings(hotswapOptionsFor(wallpaperPath, options), { screens: [screen] }))) {
     return
