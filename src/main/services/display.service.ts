@@ -1,4 +1,6 @@
 import type { BrowserWindow } from 'electron'
+import fs from 'fs'
+import path from 'path'
 import { IpcChannels } from '@shared/ipc-channels'
 import type {
   CrashEvent,
@@ -310,9 +312,20 @@ export function initDisplay(window: BrowserWindow): void {
   })
 }
 
+/** A missing drive still has a library entry. Launching that path marks a healthy wallpaper as a launch crash. */
+function wallpaperIsOnDisk(localPath: string): boolean {
+  if (!fs.existsSync(localPath)) return false
+  try {
+    return fs.statSync(localPath).isFile() || fs.existsSync(path.join(localPath, 'project.json'))
+  } catch {
+    return false
+  }
+}
+
 /**
  * Puts the last wallpaper back on each screen after a restart. A live engine already showing it is left
- * alone. Screens a playlist just claimed are skipped so the two restores do not launch over each other.
+ * alone, including a split, whose assignment is only the first slot. Screens a playlist just claimed are
+ * skipped so the two restores do not launch over each other.
  */
 export async function restoreAssignedWallpapers(skipScreens: ReadonlySet<ScreenTarget> = new Set()): Promise<void> {
   if (!getLweStatus().installed) return
@@ -321,10 +334,12 @@ export async function restoreAssignedWallpapers(skipScreens: ReadonlySet<ScreenT
   for (const [screen, wallpaperId] of Object.entries(getAssignments())) {
     if (skipScreens.has(screen) || !targets.has(screen)) continue
     const wallpaper = getWallpaper(wallpaperId)
-    if (!wallpaper?.localPath) continue
+    const localPath = wallpaper?.localPath
+    if (!wallpaper || !localPath || !wallpaperIsOnDisk(localPath)) continue
     const inst = running.get(screen)
-    // same wallpaper, still on this screen: nothing to reload
-    if (inst && !inst.split && inst.wallpaperPath === wallpaper.localPath) continue
+    // the saved id is slot 1, so relaunching it would replace the split with one wallpaper
+    if (inst?.split) continue
+    if (inst && inst.wallpaperPath === localPath) continue
     try {
       console.log(`[Display] Restoring ${wallpaper.title} on ${screen}`)
       await showWallpaper(wallpaper, screen, { dependencyPrompt: 'once', forceFresh: !inst })

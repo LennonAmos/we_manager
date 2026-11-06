@@ -724,6 +724,14 @@ export default function DetailSidebar({
     }
   }
 
+  function endVolumeGesture() {
+    const v = volumeLive.current
+    if (!volumeDragging.current && v === null) return
+    volumeLive.current = null
+    volumeDragging.current = false
+    if (v !== null) void commitVolume(v)
+  }
+
   const [isCommittingXray, setIsCommittingXray] = useState(false)
   const xrayDisabled = libraryMeta?.xrayDisabled ?? false
   const xrayFullReveal = !xrayDisabled && (libraryMeta?.xrayFullReveal ?? false)
@@ -1374,18 +1382,12 @@ export default function DetailSidebar({
                 setVolumeDraft(v)
                 previewLive({ volume: v })
               }}
-              onPointerUp={() => {
-                const v = volumeLive.current
-                volumeLive.current = null
-                volumeDragging.current = false
-                if (v !== null) void commitVolume(v)
-              }}
+              onPointerUp={endVolumeGesture}
+              onPointerCancel={endVolumeGesture}
+              onLostPointerCapture={endVolumeGesture}
+              onBlur={endVolumeGesture}
               onKeyUp={(e) => {
-                if (!isRangeKey(e.key)) return
-                const v = volumeLive.current ?? Number(e.currentTarget.value)
-                volumeLive.current = null
-                volumeDragging.current = false
-                if (Number.isFinite(v)) void commitVolume(v)
+                if (isRangeKey(e.key)) endVolumeGesture()
               }}
               className="w-full touch-none accent-accent-500 disabled:opacity-50"
             />

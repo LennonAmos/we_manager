@@ -1775,13 +1775,10 @@ export async function launchLweAsync(wallpaperPath: string, options: LweLaunchOp
   }
 
   const existing = liveInstance(screen)
-  // A different wallpaper has to be a new process. Hotswapping the path leaves the previous
-  // wallpaper's audio playing, and the new one often does not start until a later change (such as moving it).
   const canHotswap =
-    existing?.wallpaperPath === wallpaperPath &&
     !options.forceFresh &&
     !options.customArgs?.trim() &&
-    existing.launchKey === key &&
+    existing?.launchKey === key &&
     (existing.controlFile !== null || liveInstances().length === 1)
 
   if (canHotswap && (await hotswapLweSettings(hotswapOptionsFor(wallpaperPath, options), { screens: [screen] }))) {
