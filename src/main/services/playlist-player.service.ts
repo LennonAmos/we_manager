@@ -387,6 +387,12 @@ export function activePlaylistScreens(): ScreenTarget[] {
   return [...players.values()].filter((player) => player.state.playlistId).map((player) => player.state.screen)
 }
 
+/** With "Don't resume playlists", the saved screens are skipped too, or restore puts the last item back without its volume */
+export function playlistRestoreSkipScreens(): ScreenTarget[] {
+  if (getSkipPlaylistResume()) return Object.keys(savedPlayers())
+  return activePlaylistScreens()
+}
+
 /** Resumes the playlists active at the last close, true if any (the autostart playlist is then skipped) */
 
 export function initPlaylistPlayer(window: BrowserWindow): boolean {

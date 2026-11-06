@@ -14,29 +14,9 @@ import {
   testFreshLaunch
 } from '../services/display.service'
 import type { ApplyWallpaperOptions, ScreenTarget, SplitScreen } from '@shared/types'
-import { getDisplayMode, setSplitScreen } from '../services/config.service'
-import { ALL_SCREENS } from '../services/lwe.service'
+import { setSplitScreen } from '../services/config.service'
 import { deleteThumbnail, generateThumbnail, IMAGE_EXTENSIONS, useThumbnailFile } from '../services/thumbnail.service'
 import { t } from '../i18n'
-
-/** null means the user cancelled. undefined means every screen. */
-async function askWhichScreen(targets: ScreenTarget[]): Promise<ScreenTarget | undefined | null> {
-  const buttons = [...targets, t('common.allScreens'), t('common.cancel')]
-  const cancelId = buttons.length - 1
-  const parent = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
-  const box = {
-    type: 'question' as const,
-    title: t('playlist.whichScreen'),
-    message: t('playlist.whichScreen'),
-    buttons,
-    defaultId: 0,
-    cancelId
-  }
-  const { response } = parent ? await dialog.showMessageBox(parent, box) : await dialog.showMessageBox(box)
-  if (response === cancelId || response < 0) return null
-  if (response < targets.length) return targets[response]
-  return undefined
-}
 
 export function registerWallpaperHandlers(): void {
   ipcMain.handle(IpcChannels.WALLPAPER_DETECT_ENV, () => {
@@ -56,21 +36,10 @@ export function registerWallpaperHandlers(): void {
     const wallpaper = getWallpaper(options.wallpaperId)
     if (!wallpaper) throw new Error(`Wallpaper ${options.wallpaperId} not found in library`)
 
-    // the detail panel already picked a screen. Play from a card has not, and per-screen mode asks.
-    let screen = options.screen
-    if ((screen === undefined || screen === null) && getDisplayMode() === 'per-screen') {
-      const targets = expandScreen(undefined).filter((name) => name !== ALL_SCREENS)
-      if (targets.length > 1) {
-        const chosen = await askWhichScreen(targets)
-        if (chosen === null) return { ok: false, appliedPath: '' }
-        screen = chosen
-      }
-    }
-
     // a playlist would replace it again on its next switch
-    for (const target of expandScreen(screen)) pausePlaylist(target)
+    for (const target of expandScreen(options.screen)) pausePlaylist(target)
 
-    const appliedPath = await showWallpaper(wallpaper, screen, { backend: options.backend })
+    const appliedPath = await showWallpaper(wallpaper, options.screen, { backend: options.backend })
 
     updateWallpaper(options.wallpaperId, {
       appliedCount: (wallpaper.appliedCount ?? 0) + 1,

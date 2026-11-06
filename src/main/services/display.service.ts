@@ -31,6 +31,7 @@ import {
 import { resolveEngineFlags } from '@shared/engineFlags'
 import { clearAssignment, getAssignments, setAssignment } from './wallpaper-state.service'
 import { getDefaultFps, getDisplayMode, getGlobalEngineFlags, getSplitScreens } from './config.service'
+import { planRestore } from './restore-plan'
 import { ensureDependencyInstalled } from './dependency.service'
 import { t } from '../i18n'
 
@@ -152,7 +153,7 @@ export async function showSplitScreen(screen: ScreenTarget, beforeLaunch?: () =>
   const shown: WallpaperMeta[] = []
   for (const slot of split?.slots ?? []) {
     const wallpaper = getWallpaper(slot.wallpaperId)
-    if (!wallpaper?.localPath || !isAnimatedWallpaper(wallpaper)) continue
+    if (!wallpaper?.localPath || !isAnimatedWallpaper(wallpaper) || !wallpaperIsOnDisk(wallpaper.localPath)) continue
     await ensureDependencyInstalled(wallpaper)
     slots.push({
       path: wallpaper.localPath,
@@ -322,29 +323,52 @@ function wallpaperIsOnDisk(localPath: string): boolean {
   }
 }
 
+/** The slot showSplitScreen would store as the assignment, when that folder is actually there */
+function splitSlotId(screen: ScreenTarget): string | null {
+  const split = getSplitScreens()[screen]
+  if (!split) return null
+  for (const slot of split.slots) {
+    const wallpaper = getWallpaper(slot.wallpaperId)
+    if (!wallpaper?.localPath || !isAnimatedWallpaper(wallpaper) || !wallpaperIsOnDisk(wallpaper.localPath)) continue
+    return wallpaper.id
+  }
+  return null
+}
+
 /**
- * Puts the last wallpaper back on each screen after a restart. A live engine already showing it is left
- * alone, including a split, whose assignment is only the first slot. Screens a playlist just claimed are
- * skipped so the two restores do not launch over each other.
+ * Puts the last animated wallpaper back on each screen after a restart. A live engine already showing
+ * it is left alone. A split comes back through showSplitScreen. Screens a playlist or schedule just
+ * claimed are skipped so the two launches do not run over each other.
  */
 export async function restoreAssignedWallpapers(skipScreens: ReadonlySet<ScreenTarget> = new Set()): Promise<void> {
   if (!getLweStatus().installed) return
   const targets = new Set(getDisplayTargets())
   const running = new Map(getRunningInstances().map((inst) => [inst.screen, inst]))
   for (const [screen, wallpaperId] of Object.entries(getAssignments())) {
-    if (skipScreens.has(screen) || !targets.has(screen)) continue
     const wallpaper = getWallpaper(wallpaperId)
-    const localPath = wallpaper?.localPath
-    if (!wallpaper || !localPath || !wallpaperIsOnDisk(localPath)) continue
+    const localPath = wallpaper?.localPath ?? ''
     const inst = running.get(screen)
-    // the saved id is slot 1, so relaunching it would replace the split with one wallpaper
-    if (inst?.split) continue
-    if (inst && inst.wallpaperPath === localPath) continue
+    const plan = planRestore({
+      skipped: skipScreens.has(screen),
+      connected: targets.has(screen),
+      animated: !!wallpaper && isAnimatedWallpaper(wallpaper),
+      onDisk: !!localPath && wallpaperIsOnDisk(localPath),
+      localPath,
+      running: inst ? { split: !!inst.split, wallpaperPath: inst.wallpaperPath } : undefined,
+      splitSlotId: splitSlotId(screen),
+      wallpaperId
+    })
+    if (plan === 'skip' || !wallpaper) continue
     try {
-      console.log(`[Display] Restoring ${wallpaper.title} on ${screen}`)
-      await showWallpaper(wallpaper, screen, { dependencyPrompt: 'once', forceFresh: !inst })
+      if (plan === 'split') {
+        console.log(`[Display] Restoring split on ${screen}`)
+        await showSplitScreen(screen)
+      } else {
+        console.log(`[Display] Restoring ${wallpaper.title} on ${screen}`)
+        await showWallpaper(wallpaper, screen, { dependencyPrompt: 'once' })
+      }
     } catch (err) {
-      console.error(`[Display] Could not restore ${wallpaper.title} on ${screen}:`, (err as Error).message)
+      console.error(`[Display] Could not restore ${wallpaper?.title ?? wallpaperId} on ${screen}:`, (err as Error).message)
     }
   }
 }
